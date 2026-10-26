@@ -19,8 +19,12 @@ def collision(q):
     reference = packet_transmission(initial, grid.dx, height, width)
     outside = np.abs(grid.x) > 0.4 * grid.length
     edge_masses = [float(np.sum(np.abs(psi[outside]) ** 2) * grid.dx)]
+    # dt acota la fase cinética por paso en el Nyquist: dt*(pi/dx)^2/2 = 2.53 rad <= pi.
+    # Con dt=0.0025 era 12.6 rad (> 2pi): la barrera discontinua alimenta modos de k alto
+    # que resuenan con el paquete, <H> sube ~32% y llega masa al borde (4.5e-5).
+    # Mismo tiempo total: 16 controles de 5000 pasos = 2.5 unidades de tiempo cada uno.
     for _ in range(16):
-        psi = q.evolve(psi, potential, grid, dt=0.0025, steps=1000)
+        psi = q.evolve(psi, potential, grid, dt=0.0005, steps=5000)
         edge_masses.append(float(np.sum(np.abs(psi[outside]) ** 2) * grid.dx))
     probability = np.abs(psi) ** 2 * grid.dx
     # El límite es el borde derecho de la barrera; no se integra su interior.
