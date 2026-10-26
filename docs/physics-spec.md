@@ -155,9 +155,10 @@ $$
 
 El método conserva $\langle\tilde H\rangle$, no $\langle H\rangle$. Entonces
 $\langle H\rangle(t) = \langle \tilde H\rangle - \Delta t^2\langle C\rangle(t)$: oscila con amplitud $O(\Delta t^2)$
-**acotada y sin deriva secular** (no crece con $t$). Con $V=0$, $\tilde H = H$. Advertencia honesta:
-en una grilla con $\Delta t\,k_{\max}^2/2 \gg 1$ la serie es formal; el argumento vale para la parte del
-espectro que el paquete ocupa. La comprobación práctica es medir que no hay deriva.
+**acotada y sin deriva secular** (no crece con $t$). Con $V=0$, $\tilde H = H$. Advertencia: la serie es
+formal y **falla** cuando la fase cinética por paso de algún modo de la grilla supera $2\pi$; esa
+falla es la resonancia de la sección 6.4. Con la condición de 6.4 el argumento vale; la
+comprobación práctica es medir que no hay deriva.
 
 **Predicción exacta para el oscilador** ($V=\omega^2x^2/2$, todo cuadrático, Ehrenfest es exacto): los
 momentos evolucionan como el integrador de Verlet clásico, que conserva exactamente
@@ -171,6 +172,33 @@ $J = \tfrac12\langle p^2\rangle + \tfrac12(1-\omega^2\Delta t^2/4)\,\omega^2\lan
 - El estado base analítico ($\sigma_0 = 1/\sqrt{2\omega}$) no es exactamente estacionario para el
   método: `std_x` oscila entre $\sigma_0$ y $\sigma_0(1-\omega^2\Delta t^2/4)^{-1/2} \approx \sigma_0(1+\omega^2\Delta t^2/8)$
   (desvío relativo máximo $1.25\times10^{-5}$ con $\Delta t = 0.01$).
+
+### 6.4 Resolución temporal de fase: $\Delta t\,k_{\max}^2/2 \le \pi$ (requisito práctico)
+
+El factor cinético $e^{-ik^2\Delta t/2}$ solo "ve" la fase **módulo $2\pi$**. Un modo de la grilla con
+$(k^2/2 - E)\,\Delta t = 2\pi m$ ($m \ne 0$) gira por paso exactamente igual que una onda de energía $E$:
+para el método son degenerados. Un potencial con saltos (la barrera) tiene componentes de Fourier en
+todos los $q$ y, en cada medio paso de $V$, acopla el paquete ($k \approx \pm k_0$) con todos los modos.
+Normalmente esas pequeñas transferencias llegan con fases distintas y se cancelan, pero con un modo
+resonante se suman paso a paso durante toda la colisión. El resultado:
+
+- **La norma sigue exacta** (cada factor es unitario; 6.1 no depende de $\Delta t$).
+- **$\langle H\rangle$ se dispara**: la probabilidad que pasa al modo resonante tiene energía cinética
+  real $k^2/2 \gg E$. Medido con $n=8192$, $\Delta x = 0.05$, $\Delta t = 0.01$ (fase máxima 19.7 rad):
+  $\langle H\rangle$ pasa de 0.8528 a 0.9808 (+15 %), con todo el aumento en $|k|>5$.
+- **Aparece radiación rápida**: el modo resonante, $k = \sqrt{2(E\Delta t + 2\pi)/\Delta t} \approx 35$, viaja a
+  $v = k$, da varias vueltas al anillo y deja probabilidad en los bordes y dentro de la barrera.
+
+No hay resonancia posible si ningún modo de la grilla alcanza $m = 1$, es decir si
+$\Delta t\,k_{\max}^2/2 < 2\pi$ (el término $E\Delta t$ es despreciable). Esto coincide con el barrido medido
+(barrera del experimento 01): pasa con 4.9 y 5.9, falla con 6.9 y 7.9 (con $\Delta t = 0.0035$ el modo
+resonante $k = 59.9$ cabe en $k_{\max} = 62.8$; con $\Delta t = 0.003$, $k = 64.7$ ya no cabe).
+**Requisito práctico adoptado: $\Delta t\,(\pi/\Delta x)^2/2 \le \pi$**, que deja al modo más alto a media
+vuelta de la resonancia (margen $\times2$). Es obligatorio con potenciales discontinuos (barreras). Con
+potenciales suaves (oscilador), el acoplamiento a $k$ alto es exponencialmente chico y la condición
+puede violarse sin efecto medible; por ejemplo, `Grid(256, 20)` con $\Delta t = 0.01$ tiene fase 8.1 y
+cumple los criterios c-e. `evolve` **no** verifica esta condición: es responsabilidad de quien elige
+$\Delta t$ y $\Delta x$, y el ROL B debería respetarla en su prueba de túnel.
 
 ## 7. Diagnósticos (`diagnostics`)
 
@@ -259,7 +287,8 @@ $P_{\text{dentro}}$ queda en la barrera. Validez: el paquete inicial no toca la 
 bordes del anillo, y las componentes lentas que se transmitirían ya cruzaron.
 
 **Tolerancia 0.01 absoluta.** Fuentes de error: bordes de barrera discretizados $O(\Delta x)$ y división
-temporal $O(\Delta t^2)$ (ambas se miden por convergencia y deben quedar $<10^{-3}$), componentes que no
+temporal $O(\Delta t^2)$ (ambas se miden por convergencia y deben quedar $<10^{-3}$; esto solo vale si cada
+corrida cumple la condición de fase de 6.4, porque sin ella aparece radiación espuria), componentes que no
 terminaron de cruzar ($<10^{-6}$) y probabilidad que llegue a los bordes ($<10^{-10}$). Total esperado
 $\lesssim 2\times10^{-3}$: 0.01 deja margen $\times5$ y sigue siendo menor que $|T_{\text{paquete}}-T(E_0)| \approx 0.02$
 del experimento 01, así que la prueba distingue entre ambas predicciones.
@@ -268,14 +297,15 @@ del experimento 01, así que la prueba distingue entre ambas predicciones.
 
 ### 11.1 `experiments/01_tunneling.py`
 
-Parámetros: $n = 8192$, $L = 409.6$ ($\Delta x = 0.05$), $\Delta t = 0.01$, $t_f = 100$ (10000 pasos),
-$x_0 = -40$, $k_0 = 1.3$, $\sigma = 4$, $V_0 = 1$, $a = 2$, centro de barrera $c = 0.01$.
+Parámetros (revisión 1): $n = 4096$, $L = 409.6$ ($\Delta x = 0.1$), $\Delta t = 0.005$, $t_f = 100$
+(20000 pasos), $x_0 = -40$, $k_0 = 1.3$, $\sigma = 4$, $V_0 = 1$, $a = 2$, centro de barrera $c = 0.01$.
+La primera versión ($n = 8192$, $\Delta t = 0.01$, fase 19.7) violaba 6.4 y falló el criterio de energía.
 
 Cuentas:
-- Guarda: $\pi/\Delta x = 62.83 \ge 4(1.3 + 3/4) = 8.2$. Se usa $\Delta x$ mucho menor que lo que exige la
-  guarda para resolver los bordes de la barrera (40 celdas en el ancho).
-- Barrera: bordes en $-0.99$ y $1.01$, a $0.2\Delta x$ del nodo más cercano; $n_{\text{celdas}} = 40$,
-  $a_{\text{ef}} = 2.0$. Lo mismo vale con $\Delta x = 0.025$ (80 celdas), usado en la convergencia.
+- Guarda de aliasing: $\pi/\Delta x = 31.42 \ge 4(1.3 + 3/4) = 8.2$.
+- Fase por paso (6.4): $\Delta t\,k_{\max}^2/2 = 0.005 \cdot 493.5 = 2.47 \le \pi$.
+- Barrera: bordes en $-0.99$ y $1.01$, a $0.1\Delta x$ del nodo más cercano; $n_{\text{celdas}} = 20$,
+  $a_{\text{ef}} = 2.0$. Con $\Delta x = 0.05$ (convergencia en $n$) son 40 celdas, y los bordes tampoco caen en nodos.
 - Energía: $E_0 = 0.845 = 0.845\,V_0$; $\langle H\rangle(0) = 0.845 + 1/128 = 0.8528$; $\sigma_k = 0.125$.
   $T(E_0) = 0.2211$. $T_{\text{paquete}} \approx 0.241$ (cuadratura a mano; el script da el valor exacto).
   Un $18\,\%$ de $|\phi|^2$ tiene $E > V_0$ ($k > \sqrt2$).
@@ -287,8 +317,10 @@ Cuentas:
 - Bordes: $\sigma(100) = 4\sqrt{1+(100/32)^2} = 13.1$; centro libre equivalente en $x_0+k_0t_f = 90$.
   Para tocar $\pm204.8$ hace falta $k \ge 2.45 = k_0 + 9.2\sigma_k$ (peso $\sim10^{-18}$). Lo reflejado
   está en $\approx -(x_0 + kt)$, simétrico.
-- Convergencia que corre el script: $T_{\text{med}}$ con $n = 16384$ (mismo $L$) y con $\Delta t = 0.005$;
-  ambas diferencias contra la corrida base deben ser $<10^{-3}$.
+- Convergencia que corre el script, cumpliendo 6.4 en cada corrida: $T_{\text{med}}$ con $n = 8192$ y
+  $\Delta t = 0.00125$ (refina $\Delta x$ con la misma fase por paso, 2.47) y con $n = 4096$ y $\Delta t = 0.0025$
+  (fase 1.23). Ambas diferencias contra la corrida base deben ser $<10^{-3}$. Medición previa del
+  tester: $T(n{=}4096) = 0.24077$ y $T(n{=}8192) = 0.24114$, una diferencia de $4\times10^{-4}$.
 
 **Qué deberías ver y por qué.**
 1. $t=0$: una campana centrada en $-40$; el color (fase) da una vuelta completa cada
@@ -301,7 +333,9 @@ Cuentas:
    anchos (dispersión). El transmitido tiene franjas de color algo más apretadas ($\langle k\rangle > k_0$).
 5. Error de norma: plano en $\sim10^{-14}$-$10^{-13}$ (solo redondeo, 6.1).
 6. Error de energía: un "bulto" mientras el paquete toca la barrera (los conmutadores de 6.3 son
-   grandes donde $V$ salta) de orden $10^{-5}$-$10^{-4}$ relativo, que vuelve casi a cero después.
+   grandes donde $V$ salta). Estimado $\lesssim 10^{-5}$ relativo con $\Delta t = 0.005$ (escala como
+   $\Delta t^2$); después de la colisión vuelve a $\sim10^{-13}$ porque, donde $V' = 0$, $\tilde H = H$. Si en
+   cambio crece hasta $10^{-2}$-$10^{-1}$ y no vuelve, es la resonancia de 6.4 (fase por paso demasiado grande).
 7. Barras: $T_{\text{med}} \approx T_{\text{paquete}} \approx 0.24$, claramente distinta de $T(E_0) \approx 0.22$.
 
 ### 11.2 `experiments/02_euler_vs_splitstep.py`
@@ -338,3 +372,4 @@ Todo se importa desde `quantum1d`: `Grid`, `check_resolution`, `gaussian_packet`
   forma `(grid.n,)`, si `V` no es real, si `dt` no es un real finito o si `steps` no es un entero $\ge 0$.
 - `norm`, `mean_x`, `mean_p`, `std_x` con firma `(psi, grid)`; `energy(psi, V, grid)`; devuelven `float` (sección 7).
 - Transmisión medida: sección 10. Ancho de barrera para la fórmula: `count_nonzero(V) * dx`.
+- Con potenciales discontinuos, elegir `dt * (pi/dx)**2 / 2 <= pi` (sección 6.4). `evolve` no lo verifica.

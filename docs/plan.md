@@ -8,7 +8,7 @@ Un paquete Python `quantum1d` (src layout) que resuelve Schrödinger 1D dependie
 
 ### Context
 - `C:/dev/quantum-A/docs/physics-spec.md`: física, convenciones exactas de la API (sección 12), parámetros y cuentas de los experimentos (sección 11). Es la fuente de verdad para el coder; solo lectura.
-- `C:/dev/quantum-A/docs/decisions/0001`...`0006`: decisiones aceptadas (checks con PYTHONPATH, guarda, diagnostics, barrera, ubicación de fórmulas, semántica de evolve).
+- `C:/dev/quantum-A/docs/decisions/0001`...`0007`: decisiones aceptadas (checks con PYTHONPATH, guarda, diagnostics, barrera, ubicación de fórmulas, semántica de evolve, resolución temporal de fase del experimento 01).
 - `C:/dev/quantum-A/README.md`: único archivo previo; no se toca.
 - Contrato del usuario (mensaje del orquestador): API pública, física a-g, reglas permanentes 1-6, reparto A/B.
 
@@ -24,6 +24,7 @@ Un paquete Python `quantum1d` (src layout) que resuelve Schrödinger 1D dependie
 - Sanity checks del tester: scripts en su scratchpad, fuera del repo, sin commitear (decisión 0005).
 
 ### Files to touch
+- Revisión 1 (fix de AC18): el coder solo modifica `experiments/01_tunneling.py` (pasos 9.1, 9.6 y 9.8), regenera `outputs/01_tunneling.png` y `outputs/report.md`, y actualiza `STATUS.md`. El resto de esta lista ya está implementado y no cambia.
 - `pyproject.toml` (create): metadatos y stack para uv (paso 1).
 - `AGENTS.md` (create): las 6 reglas permanentes textuales, reparto A/B y cómo correr (paso 2).
 - `CLAUDE.md` (create): solo remite a AGENTS.md (paso 2).
@@ -63,7 +64,7 @@ Comandos en bash desde `C:/dev/quantum-A`; `P=` abrevia `PYTHONPATH=src python`.
 - AC15 (d): Convergencia: `Grid(256, 20.0)`, `harmonic(g,1.0)`, `psi0 = gaussian_packet(g,1.0,0.5,sqrt(0.5))`, t=2, dt ∈ {0.04, 0.02, 0.01, 0.005}, referencia dt=0.000625; error `sqrt(dx·Σ|psi-psi_ref|²)`. Check: script con `polyfit(log dt, log err, 1)`. Pass: pendiente en [1.9, 2.1] y cada cociente err(dt)/err(dt/2) en [3.6, 4.4].
 - AC16 (e): Energía: setup de AC14 con dt=0.01 (2000 pasos) y dt=0.005 (4000 pasos), `energy` cada 0.1 de tiempo. Check: script. Pass: pico a pico con dt=0.01 en [4.5e-5, 5.5e-5] (predicción dt²x0²/8 = 5.0e-5, spec 6.3); cociente pico-a-pico(0.01)/pico-a-pico(0.005) en [3.6, 4.4]; `max|E-E0|` en t ∈ [10,20] ≤ 1.1 × el de t ∈ [0,10] (sin deriva).
 - AC17: `P experiments/01_tunneling.py` sale con código 0 y deja `outputs/01_tunneling.png` (> 0 bytes) y `outputs/report.md` con todas las claves del paso 9.6. Check: correr el script; `P -c` que parsea el reporte con la regex `^\| (\w+) \| ([^|]+) \|$`. Pass: código 0, archivos presentes, ninguna clave faltante.
-- AC18 (f): Valores de `outputs/report.md`: `abs_diff_measured_packet < 0.01`; `conv_diff_N < 1e-3`; `conv_diff_dt < 1e-3`; `P_near_edges < 1e-10`; `P_inside_barrier < 1e-6`; `|T_measured+R_measured+P_inside_barrier-1| < 1e-10`; `|T_E0-0.221138| < 1e-5`; `0.236 < T_packet < 0.246`; `abs_diff_measured_E0 > 0.01`; `norm_error_max < 1e-10`; `energy_rel_dev_max < 1e-3`; `n_barrier_cells == 40`; `a_effective == 2.0`; `kmax >= guard_rhs`. Check: `P -c` sobre el reporte parseado. Pass: las 14 condiciones `True`.
+- AC18 (f): Valores de `outputs/report.md`: `abs_diff_measured_packet < 0.01`; `conv_diff_N < 1e-3`; `conv_diff_dt < 1e-3`; `P_near_edges < 1e-10`; `P_inside_barrier < 1e-6`; `|T_measured+R_measured+P_inside_barrier-1| < 1e-10`; `|T_E0-0.221138| < 1e-5`; `0.236 < T_packet < 0.246`; `abs_diff_measured_E0 > 0.01`; `norm_error_max < 1e-10`; `energy_rel_dev_max < 1e-3`; `n_barrier_cells == 20` (revisión 1: dx = 0.1, así que el ancho 2.0 ocupa 20 celdas; antes eran 40 con dx = 0.05); `a_effective == 2.0`; `kmax >= guard_rhs`; `phase_per_step_base`, `phase_per_step_convN` y `phase_per_step_convdt` todas `<= 3.1416` (≈ π; condición de resolución temporal de fase, spec 6.4 y decisión 0007). Check: `P -c` sobre el reporte parseado. Pass: las 15 condiciones `True`.
 - AC19: Fórmula de T del experimento, cargada con `importlib.util.spec_from_file_location("tun", "experiments/01_tunneling.py")` (sin ejecutar `main`): `transmission_plane_wave(0.845,1,2)` = 0.221138 ± 1e-5; `(1.0,1,2)` = 1/3 ± 1e-12; `(1.125,1,2)` = 0.442713 ± 1e-5; `(0.5,1,2)` = 0.070651 ± 1e-5; `|T(1±1e-9)-1/3| < 1e-6`; con `E = array([0.5,1.0,1.125])` devuelve forma `(3,)`. Check: script. Pass: todo `True` y la importación no genera archivos.
 - AC20: La figura 01 muestra fondo oscuro, 4 paneles de |psi|² en t = 0, 30, 50, 100 con la curva y un relleno coloreados por la fase (colormap cíclico y barra de color de -π a π), la barrera sombreada, un panel log de error de norma y de energía vs t, y un panel de 3 barras rotuladas (T medida, T(E0), T paquete) con su valor. Check: abrir `outputs/01_tunneling.png` y revisarla. Pass: los 6 elementos presentes y legibles.
 - AC21 (g): `P experiments/02_euler_vs_splitstep.py` sale con código 0, crea `outputs/02_euler_vs_splitstep.png` e imprime `euler_norm_error_final=<v>` con v en [3.75e-4, 1.5e-3] (predicción 7.5e-4, spec 11.2), `splitstep_norm_error_final=<v>` con v < 1e-10, y `euler_norm_monotonic=True`. Check: correr y leer stdout. Pass: las 3 líneas cumplen y el PNG existe.
@@ -82,15 +83,16 @@ Comandos en bash desde `C:/dev/quantum-A`; `P=` abrevia `PYTHONPATH=src python`.
 - Barrera con intervalo cerrado y ancho efectivo (decisión 0004); el experimento desplaza el centro 0.01.
 - Fórmulas de T dentro del experimento 01 como funciones importables; sanity checks del tester fuera del repo (decisión 0005). Rechazado: un `experiments/theory.py` (archivo fuera del layout pedido).
 - Parámetros del experimento 01 (spec 11.1): σ = 4 da |T_paquete − T(E0)| ≈ 0.02, el doble de la tolerancia, y todavía permite un dominio de 409.6. σ = 10 da una diferencia de 0.003 (no distinguible); σ = 3 da más contraste, pero dispersa más y deja ~25 % del paquete por encima de V0.
+- Revisión 1: todas las corridas del experimento 01 cumplen `dt*(pi/dx)**2/2 <= pi` (decisión 0007). La base pasa a N=4096 (dx=0.1) con dt=0.005 (fase 2.47). La convergencia en N usa N=8192 con dt=0.00125, para mantener la misma fase por paso; la convergencia en dt usa N=4096 con dt=0.0025 (fase 1.23). Rechazado: N=8192 con dt=0.0025 (opción B del tester; la fase 4.9 deja poco margen al umbral 2π, y la convergencia en N exigiría dt=0.000625). Rechazado también: N=4096 con dt=0.01 (fase 4.93, margen de apenas ×1.27).
 
 ## Riesgos y casos borde
 - Bordes de barrera sobre nodos: mitigado con center=0.01 (válido para dx = 0.1, 0.05, 0.025, 0.0125).
-- Energía con barrera: los conmutadores de 6.3 son grandes en el salto de V; se estima ~1e-4 relativo, con un umbral de 1e-3. Si falla, se reporta (no se relaja).
+- Energía con barrera: los conmutadores de 6.3 son grandes en el salto de V. Con fase por paso ≤ π se estima un bulto ≲ 1e-5 relativo durante la colisión y ~1e-13 después, con un umbral de 1e-3. Con fase por paso > 2π hay resonancias que sacan +15 % de energía (revisión 1, spec 6.4). Si falla, se reporta (no se relaja).
+- Tiempo de cómputo de la revisión 1: 20000 + 40000 pasos con N=4096 y 80000 con N=8192; estimado de 1 a 4 min.
 - Python 3.14 local vs 3.12 declarado: no usar sintaxis nueva (PEP 695, `type X = ...`).
 - Consola de Windows: imprimir solo ASCII.
 - `log(0)` en los gráficos de error: piso de 1e-17 con comentario.
 - El ROL B podría esperar un `ValueError` de `evolve` por resolución: queda documentado en spec 8 y 12 (pregunta abierta 1).
-- Tiempo de cómputo del exp01 (3 corridas, ~40k pasos con FFT de 8k-16k): estimado < 1 min.
 
 ## Pasos ordenados
 1. `pyproject.toml`: `[build-system] requires=["hatchling"]`, `build-backend="hatchling.build"`; `[project] name="quantum1d"`, `version="0.1.0"`, `readme="README.md"`, `requires-python=">=3.12"`, `dependencies=["numpy>=1.26","scipy>=1.11","matplotlib>=3.8"]`; `[dependency-groups] dev=["pytest>=8"]`; `[tool.hatch.build.targets.wheel] packages=["src/quantum1d"]`; `[tool.pytest.ini_options] testpaths=["tests"]`, `pythonpath=["src"]`.
@@ -102,17 +104,17 @@ Comandos en bash desde `C:/dev/quantum-A`; `P=` abrevia `PYTHONPATH=src python`.
 7. `diagnostics.py`: las 5 funciones con las definiciones exactas de spec 7; helper privado `_checked_norm` que lanza `ValueError` si la norma es 0.
 8. `__init__.py`: reexporta todo lo de spec 12 y define `__all__`; docstring del paquete con unidades.
 9. `experiments/01_tunneling.py`:
-   1. Constantes con comentario: `N=8192`, `L=409.6`, `DT=0.01`, `T_FINAL=100.0`, `X0=-40.0`, `K0=1.3`, `SIGMA=4.0`, `V0=1.0`, `A=2.0`, `BARRIER_CENTER=0.01`, `SNAPSHOT_TIMES=(0,30,50,100)`, `RECORD_EVERY=50`, `EDGE_MARGIN=20.0`.
+   1. Constantes con comentario (revisión 1): `N=4096`, `L=409.6` (dx=0.1), `DT=0.005` (20000 pasos), `T_FINAL=100.0`, `X0=-40.0`, `K0=1.3`, `SIGMA=4.0`, `V0=1.0`, `A=2.0`, `BARRIER_CENTER=0.01`, `SNAPSHOT_TIMES=(0,30,50,100)`, `RECORD_EVERY=100` (cada 0.5 de tiempo), `EDGE_MARGIN=20.0`, `CONV_N=(8192, 0.00125)`, `CONV_DT=(4096, 0.0025)`, `MAX_PHASE_PER_STEP=math.pi`. El comentario de esta última explica que la resonancia aparece en 2π y que π deja margen ×2 (spec 6.4). `run` calcula `phase = dt*(pi/dx)**2/2` y lanza `ValueError` si supera `MAX_PHASE_PER_STEP`. Es una guarda del experimento, no de `evolve`.
    2. `transmission_plane_wave(E, V0, a)`: vectorizada con las 3 ramas de spec 10 (`E == V0` exacto usa el límite) y `np.errstate` para las ramas descartadas.
    3. `transmission_packet(psi0, grid, V0, a) -> float`: `phi = fft(psi0)`, suma sobre `grid.k > 0` según spec 10.
    4. `run(n, dt, record)`: arma la grilla, la barrera y el paquete; evoluciona por tramos de `RECORD_EVERY` pasos; si `record`, guarda `t`, `norm`, `energy` y snapshots; devuelve el psi final y el historial.
    5. Regiones: `right = x > c+a/2`, `left = x < c-a/2`, `inside` el resto; `near_edges = |x| > L/2 - EDGE_MARGIN`.
-   6. `write_report(path, rows)`: Markdown con tablas `| clave | valor |` (floats con `f"{v:.10g}"`), con exactamente estas claves: N, L, dx, dt, steps, t_final, x0, k0, sigma, V0, a, barrier_center, n_barrier_cells, a_effective, kmax, guard_rhs, E0, H0, T_measured, R_measured, P_inside_barrier, P_near_edges, T_E0, T_packet, abs_diff_measured_packet, abs_diff_measured_E0, T_measured_N16384, T_measured_dt0005, conv_diff_N, conv_diff_dt, norm_error_max, energy_rel_dev_max, energy_rel_dev_final. `a` en las fórmulas es `a_effective`.
+   6. `write_report(path, rows)`: Markdown con tablas `| clave | valor |` (floats con `f"{v:.10g}"`), con exactamente estas claves: N, L, dx, dt, steps, t_final, x0, k0, sigma, V0, a, barrier_center, n_barrier_cells, a_effective, kmax, guard_rhs, E0, H0, T_measured, R_measured, P_inside_barrier, P_near_edges, T_E0, T_packet, abs_diff_measured_packet, abs_diff_measured_E0, T_measured_convN, T_measured_convdt, convN_N, convN_dt, convdt_N, convdt_dt, conv_diff_N, conv_diff_dt, norm_error_max, energy_rel_dev_max, energy_rel_dev_final, phase_per_step_base, phase_per_step_convN, phase_per_step_convdt. Revisión 1: `T_measured_N16384` y `T_measured_dt0005` se reemplazan por `T_measured_convN` y `T_measured_convdt`, y se agregan las claves de N, dt y fase de cada corrida. `a` en las fórmulas es `a_effective`.
    7. `make_figure(...)`: `dark_background`, GridSpec 3×2. Cuatro snapshots en x ∈ [-150, 150] con `LineCollection` y `PolyCollection` (quads bajo la curva, alpha ≈ 0.35) coloreados por `np.angle(psi)` con `twilight` y `Normalize(-π, π)`; `axvspan` gris para la barrera; colorbar de fase. Panel log con `|N-1|` y `|E-E0|/|E0|` y piso de 1e-17. Panel de 3 barras con su valor anotado. `dpi=150`.
-   8. `main()`: corrida base con registro; corridas de convergencia (`n=16384`; `dt=0.005`) sin registro; escribe la figura y el reporte; imprime un resumen ASCII. Guarda `if __name__ == "__main__": main()`.
+   8. `main()`: corrida base con registro; corridas de convergencia `CONV_N` (N=8192, dt=0.00125, 80000 pasos) y `CONV_DT` (N=4096, dt=0.0025, 40000 pasos) sin registro; `conv_diff_N = |T_measured_convN - T_measured|` y `conv_diff_dt = |T_measured_convdt - T_measured|`; escribe la figura y el reporte; imprime un resumen ASCII. Guarda `if __name__ == "__main__": main()`.
 10. `experiments/02_euler_vs_splitstep.py`: parámetros de spec 11.2 (`Grid(128, 18.0)`, `harmonic(g,1.0)`, `gaussian_packet(g,1.0,0.0,sqrt(0.5))`, `dt=2.5e-4`, 8000 pasos, registro cada 20); `euler_step(psi, V, grid, dt)` local (Hψ con cinética vía FFT más Vψ); split-step con `evolve` en tramos de 20; figura semilog de `|N-1|` para ambos métodos (piso de 1e-17) en `outputs/02_euler_vs_splitstep.png`; imprime las 3 líneas de AC21.
 11. Correr ambos experimentos y commitear `outputs/`. Comprobar a mano AC17, AC18 y AC21.
-12. `STATUS.md`: Hecho / Falla / Lo que NO verifiqué / Mejoras no implementadas, con los números del reporte. Lo actualiza el coder al final del ciclo con el resultado del tester.
+12. `STATUS.md`: Hecho / Falla / Lo que NO verifiqué / Mejoras no implementadas, con los números del reporte. Revisión 1: agregar en Falla, como resuelto, el diagnóstico de la fase por paso, y en Mejoras "guarda o advertencia de `dt*kmax**2/2` en evolve". Lo actualiza el coder al final del ciclo con el resultado del tester.
 13. Tester: scripts de sanity en su scratchpad para AC2-AC16, AC19 y AC27; corre AC1, AC17-AC18 y AC20-AC26. No escribe en `tests/`.
 
 ## Preguntas abiertas y supuestos
@@ -124,3 +126,13 @@ Comandos en bash desde `C:/dev/quantum-A`; `P=` abrevia `PYTHONPATH=src python`.
 ## Memory
 - Decisiones escritas: `docs/decisions/0001-stack-uv-y-checks-locales.md`, `0002-guarda-de-resolucion.md`, `0003-convenciones-de-diagnostics.md`, `0004-barrera-discretizada.md`, `0005-ubicacion-de-formulas-y-sanity-checks.md`, `0006-semantica-de-evolve.md`.
 - Lecciones: 3 agregadas a `docs/lessons-learned.md` (convergencia con V=0, bordes de barrera sobre nodos, sin uv en el entorno).
+- Revisión 1: decisión `docs/decisions/0007-resolucion-temporal-de-fase.md` y 1 lección (fase cinética por paso con potenciales discontinuos).
+
+## Revisions
+- Revisión 1 (2026-10-26, falla de diseño en AC18): con N=8192 y dt=0.01, la fase cinética máxima por paso `dt*kmax**2/2` era 19.7 rad. Había modos de la grilla en resonancia numérica con el paquete (`(k**2/2 - E)*dt` múltiplo de 2π, con k ≈ 35); la barrera los excitaba y el resultado fue `energy_rel_dev_max` = 0.15, `P_near_edges` = 5e-6 y `P_inside_barrier` = 1.1e-6. Cambios:
+  - Parámetros del experimento 01 (pasos 9.1, 9.6, 9.8): base N=4096 con dt=0.005; convergencia N=8192 con dt=0.00125 y N=4096 con dt=0.0025; todas con fase ≤ π.
+  - Claves del reporte: renombradas las de convergencia y agregadas N, dt y fase por corrida.
+  - AC18: `n_barrier_cells` pasa de 40 a 20 y se agrega la condición 15 (fase ≤ π). Los umbrales de AC18 no cambian.
+  - Spec: nueva sección 6.4 y sección 11.1 corregida; el bulto de energía se estimaba en ~1e-4 y ahora en ≲1e-5 con fase ≤ π.
+  - Nueva decisión 0007.
+  - En STATUS.md, el coder agrega como mejora no implementada: "guarda o advertencia de fase por paso en evolve".
