@@ -9,6 +9,7 @@ Las fórmulas analíticas viven SOLO en este archivo (decisión 0005). Genera
 outputs/01_tunneling.png y outputs/report.md.
 """
 
+import math
 from pathlib import Path
 
 import matplotlib
@@ -30,9 +31,9 @@ from quantum1d import (  # noqa: E402
 )
 
 # --- Parámetros (physics-spec 11.1) ---
-N = 8192  # nodos; con L=409.6 da dx=0.05 (40 celdas en la barrera)
+N = 4096  # nodos; con L=409.6 da dx=0.1 (20 celdas en la barrera)
 L = 409.6  # largo del anillo; deja ~205 de margen a cada lado del paquete
-DT = 0.01  # paso temporal; el error O(dt^2) se verifica con la corrida dt=0.005
+DT = 0.005  # paso temporal; fase cinética por paso 2.47 rad <= pi (spec 6.4); O(dt^2) se verifica con CONV_DT
 T_FINAL = 100.0  # tiempo final: la colisión ocurre en t~31 y ya terminó
 X0 = -40.0  # posición inicial: 9.75 sigma del borde de la barrera, sin solapamiento
 K0 = 1.3  # momento medio (= velocidad); E0 = 0.845 < V0
@@ -41,8 +42,13 @@ V0 = 1.0  # altura de la barrera
 A = 2.0  # ancho nominal de la barrera
 BARRIER_CENTER = 0.01  # desplazado para que ningún borde (-0.99, 1.01) caiga sobre un nodo
 SNAPSHOT_TIMES = (0.0, 30.0, 50.0, 100.0)  # instantes de la figura
-RECORD_EVERY = 50  # pasos entre registros de norma/energía (0.5 de tiempo)
+RECORD_EVERY = 100  # pasos entre registros de norma/energía (0.5 de tiempo con DT=0.005)
 EDGE_MARGIN = 20.0  # franja junto a +-L/2 donde se mide la probabilidad que "da la vuelta"
+CONV_N = (8192, 0.00125)  # (n, dt) de la corrida de convergencia en dx: dx=0.05 y misma fase por paso (2.47 rad)
+CONV_DT = (4096, 0.0025)  # (n, dt) de la corrida de convergencia en dt: mismo dx, dt a la mitad
+# Fase cinética máxima por paso dt*kmax^2/2. La resonancia numérica entre modos de la grilla y el
+# paquete aparece cuando (k^2/2 - E)*dt llega a 2*pi; pi deja un margen x2 (physics-spec 6.4, decisión 0007).
+MAX_PHASE_PER_STEP = math.pi
 LOG_FLOOR = 1e-17  # piso para log10 de errores nulos (bajo el redondeo ~1e-16); solo para graficar
 VIEW_HALF_WIDTH = 150.0  # los paneles de |psi|^2 muestran x en [-150, 150]
 
@@ -77,6 +83,11 @@ def transmission_packet(psi0, grid, V0, a):
     return float(np.sum(weights[positive] * t_k) / np.sum(weights[positive]))
 
 
+def phase_per_step(grid, dt):
+    """Fase cinética máxima acumulada por paso, dt*kmax^2/2 (rad), con kmax = pi/dx (hbar = m = 1)."""
+    return float(dt * (np.pi / grid.dx) ** 2 / 2.0)
+
+
 def run(n, dt, record):
     """Evoluciona el paquete hasta T_FINAL en una grilla de n nodos y paso dt.
 
@@ -84,6 +95,11 @@ def run(n, dt, record):
     copias de psi en SNAPSHOT_TIMES. Devuelve (grid, V, psi0, psi_final, history).
     """
     grid = Grid(n, L)
+    phase = phase_per_step(grid, dt)
+    if phase > MAX_PHASE_PER_STEP:
+        raise ValueError(
+            f"fase por paso {phase:.4g} rad > {MAX_PHASE_PER_STEP:.4g}: riesgo de resonancia; reduzca dt o n"
+        )
     V = barrier(grid, BARRIER_CENTER, A, V0)
     psi0 = gaussian_packet(grid, X0, K0, SIGMA)
     total_steps = int(round(T_FINAL / dt))
@@ -225,9 +241,9 @@ def main():
     t_e0 = float(transmission_plane_wave(e0, V0, a_eff))
     t_packet = transmission_packet(psi0, grid, V0, a_eff)
 
-    grid_n, V_n, _, psi_n, _ = run(2 * N, DT, record=False)
+    grid_n, V_n, _, psi_n, _ = run(*CONV_N, record=False)
     t_n = measure(psi_n, grid_n, float(np.count_nonzero(V_n) * grid_n.dx))[0]
-    grid_d, V_d, _, psi_d, _ = run(N, DT / 2, record=False)
+    grid_d, V_d, _, psi_d, _ = run(*CONV_DT, record=False)
     t_d = measure(psi_d, grid_d, float(np.count_nonzero(V_d) * grid_d.dx))[0]
 
     norm_err = np.abs(np.array(hist["norm"]) - 1.0)
@@ -259,13 +275,18 @@ def main():
             ("abs_diff_measured_E0", abs(t_meas - t_e0)),
         ]),
         ("Convergencia", [
-            ("T_measured_N16384", t_n), ("T_measured_dt0005", t_d),
+            ("T_measured_convN", t_n), ("T_measured_convdt", t_d),
+            ("convN_N", CONV_N[0]), ("convN_dt", CONV_N[1]),
+            ("convdt_N", CONV_DT[0]), ("convdt_dt", CONV_DT[1]),
             ("conv_diff_N", abs(t_n - t_meas)), ("conv_diff_dt", abs(t_d - t_meas)),
         ]),
         ("Conservación", [
             ("norm_error_max", float(np.max(norm_err))),
             ("energy_rel_dev_max", float(np.max(e_dev))),
             ("energy_rel_dev_final", float(e_dev[-1])),
+            ("phase_per_step_base", phase_per_step(grid, DT)),
+            ("phase_per_step_convN", phase_per_step(grid_n, CONV_N[1])),
+            ("phase_per_step_convdt", phase_per_step(grid_d, CONV_DT[1])),
         ]),
     ]
     make_figure(OUTPUT_DIR / "01_tunneling.png", grid, V, hist, values)

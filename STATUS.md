@@ -5,20 +5,14 @@
 - Paquete `quantum1d` (`Grid`, `check_resolution`, `gaussian_packet`, `free`, `barrier`, `harmonic`, `evolve`, diagnósticos) según `docs/physics-spec.md` sección 12.
 - `experiments/01_tunneling.py` y `experiments/02_euler_vs_splitstep.py`, con `outputs/01_tunneling.png`, `outputs/02_euler_vs_splitstep.png` y `outputs/report.md`.
 - Verificación rápida del coder con scripts temporales fuera del repo (no son tests): AC1-AC17, AC19, AC21, AC22, AC24, AC25, AC27 pasan. Números: norma `|N-1|` < 5e-13 en AC11; reversibilidad 3.3e-14; convergencia en dt con pendiente 2.007; pico a pico de energía del oscilador 4.9999e-5.
-- Experimento 01 (`outputs/report.md`): T_measured = 0.2412214, T_packet = 0.2412562 (diferencia 3.5e-5), T_E0 = 0.2211382 (diferencia con la medida 0.0201); conv_diff_N = 7.0e-5, conv_diff_dt = 6.0e-5; norm_error_max = 3.3e-12.
+- Experimento 01 (revisión 1: N=4096, dx=0.1, dt=0.005; `outputs/report.md`): T_measured = 0.2407910, T_packet = 0.2412562 (diferencia 4.7e-4), T_E0 = 0.2211382 (diferencia con la medida 0.0197); conv_diff_N = 3.5e-4 (N=8192, dt=0.00125), conv_diff_dt = 4.7e-6 (dt=0.0025); norm_error_max = 5.7e-12; energy_rel_dev_max = 3.2e-6; P_near_edges = 1.8e-13; P_inside_barrier = 4.0e-13; fase por paso 2.467 rad (base y convN), 1.234 rad (convdt).
 - Experimento 02: `euler_norm_error_final` = 7.509e-4, `splitstep_norm_error_final` = 2.46e-12, `euler_norm_monotonic=True`.
 
 ## Falla
 
-AC18 falla en 3 de 14 condiciones (no se tocaron parámetros ni tolerancias):
+- AC18 condición 6, `|T_measured+R_measured+P_inside_barrier-1| < 1e-10`: con los valores impresos del reporte (10 cifras, `.10g`) la suma da 1.004e-10 de error. Es redondeo de impresión: el error real es `norm_error_max` = 5.7e-12. Las otras 14 condiciones de AC18 pasan. No cambié el formato ni el umbral; decisión pendiente (por ejemplo imprimir con `.12g`).
 
-| Clave | Medido | Umbral |
-|---|---|---|
-| energy_rel_dev_max | 0.1505 | < 1e-3 |
-| P_near_edges | 5.43e-6 | < 1e-10 |
-| P_inside_barrier | 1.136e-6 | < 1e-6 |
-
-Hipótesis: con dx = 0.05 y dt = 0.01, el número de onda de Nyquist k_max = 62.8 da k_max^2 dt / 2 = 19.7 rad por paso, muy por encima de pi. La discontinuidad de V excita componentes de alto k (P(|k|>5) ~ 1.4e-4 a t >= 50) que el split-step propaga con fase mal resuelta (resonancia de Strang). Esa radiación de alto k pesa mucho en la energía cinética (k^2/2 ~ 2000), recorre el anillo (v = k) y llega a los bordes. La transmisión no se ve afectada (T_measured coincide con T_packet a 3.5e-5). Evidencia: con dt = 0.0025 (mismo n) la desviación de energía baja a ~1e-7 relativo y P(|k|>5) a 8e-17 en t = 100; con n = 4096 (dx = 0.1) y dt = 0.01 la energía se conserva a ~5e-7. Las condiciones de AC18 sobre energía y bordes probablemente suponen que ese efecto no ocurre (physics-spec 6.3 advierte que la serie de Hamiltoniano modificado es formal si dt k_max^2/2 >> 1 y lo estimaba en ~1e-4). Decisión pendiente del arquitecto: cambiar parámetros (dt menor o dx mayor) o criterios.
+Resuelto en la revisión 1: las condiciones de energía y bordes de AC18 fallaban (0.15, 5e-6) por fase cinética por paso de 19.7 rad (N=8192, dt=0.01), que resonaba con modos de k alto. Con dt*kmax^2/2 <= pi (spec 6.4, decisión 0007) quedan en 3.2e-6 y 1.8e-13.
 
 ## Lo que NO verifiqué
 
@@ -30,6 +24,6 @@ Hipótesis: con dx = 0.05 y dt = 0.01, el número de onda de Nyquist k_max = 62.
 
 ## Mejoras no implementadas
 
-- Guarda de estabilidad espectral en `evolve` (aviso si dt * k_max^2 / 2 >> pi).
+- Guarda o advertencia de fase por paso en `evolve` (aviso si dt * k_max^2 / 2 > pi).
 - Filtro de alto k o paso adaptativo para barreras de borde abrupto.
 - Parámetros de CLI para los experimentos.
