@@ -19,6 +19,7 @@ es evidencia de que el motor pase. Se usan unidades naturales: ℏ = m = 1.
 | Deriva de energía (e) | Energía casi constante en evolución armónica desplazada | Máxima deriva relativa < 2e−5 con dt = 0.005 hasta t = 10; margen sobre el error O(dt²) del Hamiltoniano modificado | Integración disipativa, fases equivocadas o diagnósticos inconsistentes |
 | Túnel (f) | T medida ≈ Σ_{k>0}\|FFT(ψ₀)\|²T(k²/2) / Σ_{k>0}\|FFT(ψ₀)\|² | 0.01 absoluto; dx = 0.03125, barrera de ancho 1 con bordes entre muestras; error espacial y separación temporal en un potencial discontinuo | Comparar solo con T(E₀), barrera mal escalada o probabilidades incorrectas |
 | Ventana de colisión (f) | A t = 40, reflexión y transmisión separadas; masa despreciable cerca de bordes | Masa central (±8) < 0.002 y exterior (\|x\| > 0.4L) < 1e−6 en todos los controles; presupuesto pequeño respecto del 1% de T | Medir durante colisión o después de envoltura periódica |
+| Norma en colisión larga | Probabilidad total 1 tras los 16000 pasos del túnel | 1e−9 absoluto; presupuesto de redondeo mayor que en 2000 pasos, sin renormalizar | Pérdida acumulada de probabilidad durante dispersión |
 | Euler (g) | Un modo plano libre crece como (1+[E·dt]²)^steps en norma cuadrada | 2e−12 relativo para la predicción y crecimiento > 20%; dt·E = 0.05, 100 pasos | Mostrar una comparación que renormaliza Euler y esconde su inestabilidad |
 | Aliasing | kmax < 4(k₀+3/σ) debe rechazar el paquete | ValueError en resolución insuficiente; aceptación justo en igualdad y con margen cuando existe helper | Aliasing silencioso o desigualdad invertida |
 | Contrato de evolución | Sin mutación del estado de entrada; salida nueva; un modo plano adquiere exp[−i(k²/2+V)t] | Identidad exacta de entrada; 2e−12 absoluto de fase; 2e−11 para reversibilidad | Cambios in place, fase global omitida, pasos o FFT mal aplicados |
@@ -28,8 +29,8 @@ Parámetros del túnel fijados: N = 8192, L = 256, x₀ = −35, k₀ = 2,
 El centro evita depender de la convención de inclusión de puntos en los bordes.
 Se controla la masa exterior cada 2.5 unidades de tiempo y también al comienzo.
 La separación prevista es aproximadamente ±45, muy lejos de ±128; además se
-comprueban colas analíticas del paquete libre en toda la ventana y su flujo acumulado
-hacia el borde. Esto acota el riesgo de envoltura; no prueba ausencia matemática de
+comprueban colas analíticas del paquete libre en toda la ventana.
+Esto acota el riesgo de envoltura; no prueba ausencia matemática de
 amplitudes infinitesimales ni observa cada paso de un potencial discontinuo.
 
 ## Fórmulas y decisiones
@@ -52,13 +53,38 @@ para ambas convenciones; en el resto se integra la probabilidad directamente.
 `potentials` y `diagnostics` se acceden desde el paquete público `quantum1d`.
 La guarda se prueba mediante `quantum1d.check_resolution` si existe; en caso
 contrario `evolve` debe rechazar un estado construido fuera de resolución.
+La guarda especificada usa k₀ con signo; los tests del umbral usan incidencia
+positiva y no presuponen que el constructor sustituya k₀ por |k₀|.
 No se presupone validación adicional de argumentos fuera del contrato.
 
 ## Ejecución y resultados
 
-Pendiente: autoconsistencia analítica y disponibilidad de Python 3.12/uv.
-Los tests de integración necesitan el paquete `quantum1d` del constructor tras
-integración; no se copiará ni se leerá su implementación para hacerlos pasar.
+2026-10-26: uv 0.13.5, Python 3.12.15, NumPy 2.5.4, SciPy 1.18.1,
+pytest 9.1.1, en entorno temporal externo al repositorio. Las predicciones
+se registraron primero en el commit `98284fa`; no se ajustó ninguna tolerancia.
+El ejecutable usado fue `C:\Users\ASUS\AppData\Local\Temp\gbquantum-auditor-uv\bin\uv.exe`;
+los comandos siguientes lo abrevian como `uv` (no se instaló globalmente).
+
+```powershell
+uv run --no-project --python 3.12 --with numpy --with scipy --with pytest pytest -p no:cacheprovider tests/test_analytic_selfcheck.py
+uv run --no-project --python 3.12 --with numpy --with scipy --with pytest pytest -p no:cacheprovider tests -q --tb=line
+```
+
+Resultado final de la suite: **29 pasaron, 39 errores de preparación**, todos
+`ModuleNotFoundError: No module named 'quantum1d'`. Ningún test del motor alcanzó
+sus aserciones. Los 29 aprobados son 27 autochecks analíticos, la demostración
+negativa de Euler y el margen espacial analítico del túnel. No se usa `skip` para
+ocultar el paquete ausente. La suite completa recolecta 68 casos.
+
+Predicciones numéricas independientes: T(E₀) = 0.19184490127131365,
+T_paquete = 0.20723017884137554; la diferencia supera un punto porcentual y
+justifica usar el promedio. Euler deja probabilidad 1.283624888738461.
+La transmisión medida queda pendiente. También se validó la fórmula de barrera
+contra un sistema lineal de continuidad de ψ y ψ′, por debajo y encima del umbral.
+
+Tras integrar e instalar el paquete del constructor: `uv run pytest tests -q`.
+Un fallo debe investigarse y reportarse; esta ejecución no autoriza relajar las
+tolerancias. No se copiará ni se leerá implementación para hacerlas pasar.
 
 ## Lo que NO verifiqué
 
