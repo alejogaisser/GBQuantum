@@ -10,9 +10,9 @@
 
 ## Falla
 
-- AC18 condición 6, `|T_measured+R_measured+P_inside_barrier-1| < 1e-10`: con los valores impresos del reporte (10 cifras, `.10g`) la suma da 1.004e-10 de error. Es redondeo de impresión: el error real es `norm_error_max` = 5.7e-12. Las otras 14 condiciones de AC18 pasan. No cambié el formato ni el umbral; decisión pendiente (por ejemplo imprimir con `.12g`).
+Nada conocido. AC18 pasa las 15 condiciones (el reporte imprime floats con `repr`, sin redondeo de impresión; `|T+R+P-1|` medido sobre el reporte es del orden de `norm_error_max` = 5.7e-12).
 
-Resuelto en la revisión 1: las condiciones de energía y bordes de AC18 fallaban (0.15, 5e-6) por fase cinética por paso de 19.7 rad (N=8192, dt=0.01), que resonaba con modos de k alto. Con dt*kmax^2/2 <= pi (spec 6.4, decisión 0007) quedan en 3.2e-6 y 1.8e-13.
+Resuelto en la revisión 1: las condiciones de energía y bordes de AC18 fallaban (0.15, 5e-6) por fase cinética por paso de 19.7 rad (N=8192, dt=0.01), que resonaba con modos de k alto. Con dt*kmax^2/2 <= pi (spec 6.4, decisión 0007) quedan en 3.2e-6 y 1.8e-13. Resuelto en la revisión 2: el formato `.10g` hacía fallar la condición 6 por redondeo de impresión.
 
 ## Lo que NO verifiqué
 

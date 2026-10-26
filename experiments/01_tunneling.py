@@ -134,12 +134,13 @@ def measure(psi, grid, a_eff):
 
 
 def write_report(path, rows):
-    """Escribe el reporte Markdown con tablas '| clave | valor |' (floats con 10 cifras)."""
+    """Escribe el reporte Markdown con tablas '| clave | valor |' (floats con repr exacto)."""
     lines = ["# Reporte del experimento 01: efecto túnel", ""]
     for title, items in rows:
         lines += [f"## {title}", "", "| clave | valor |", "|---|---|"]
         for key, value in items:
-            text = f"{value:.10g}" if isinstance(value, float) else str(value)
+            # repr(float) es exacto (round-trip): el redondeo de impresión es 0 y AC18 mide el error real
+            text = repr(float(value)) if isinstance(value, float) else str(value)
             lines.append(f"| {key} | {text} |")
         lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
